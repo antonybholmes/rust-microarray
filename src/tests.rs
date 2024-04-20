@@ -1,17 +1,11 @@
 
-
-
-
-use std::{error::Error, fs::File};
+ 
 
 #[cfg(test)]
-use crate::add;
+use std::{error::Error, fs::File};
 
-#[test]
-fn it_works() {
-    let result = add(2, 2);
-    assert_eq!(result, 4);
-}
+
+ 
 
 #[test]
 fn load_tsv() -> Result<(), Box<dyn Error>> {
@@ -29,7 +23,7 @@ fn load_tsv() -> Result<(), Box<dyn Error>> {
         .quote_style(csv::QuoteStyle::Never)
         .from_writer(vec![]);
 
-    let cols = vec![0, 1, 4];
+    let cols = vec![0, 1, 2, 8, 10];
 
     let headers = rdr.headers()?;
 
@@ -39,7 +33,7 @@ fn load_tsv() -> Result<(), Box<dyn Error>> {
 
     wtr.write_record(&header)?;
 
-    println!("{:?}", headers);
+    //println!("{:?}", headers);
 
     for result in rdr.records() {
         let record = result?;
