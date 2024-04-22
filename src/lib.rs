@@ -31,10 +31,25 @@ pub fn make_tsv() -> Result<String, MicroarrayError> {
         _ => return Err(MicroarrayError::FileError("file issue".to_string())),
     };
 
+    let cols = vec![0, 1, 2, 8, 10];
+
+    let mut data: Vec<Vec<String>> = vec![vec!["".to_string(); cols.len()]; 60000];
+
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
         .delimiter(b'\t')
         .from_reader(file);
+
+    for result in rdr.records() {
+        let record = match result {
+            Ok(val) => val,
+            _ => return Err(MicroarrayError::FileError("header issue".to_string())),
+        };
+
+        let row = cols.iter().map(|c| &record[*c]).collect::<Vec<&str>>();
+
+        data.push(row.into_iter().map(|x| x.to_string()).collect());
+    }
 
     let mut wtr = csv::WriterBuilder::new()
         .delimiter(b'\t')
@@ -42,8 +57,6 @@ pub fn make_tsv() -> Result<String, MicroarrayError> {
         .has_headers(true)
         .quote_style(csv::QuoteStyle::Never)
         .from_writer(vec![]);
-
-    let cols = vec![0, 1, 2, 8, 10];
 
     let headers = match rdr.headers() {
         Ok(val) => val,
@@ -61,13 +74,14 @@ pub fn make_tsv() -> Result<String, MicroarrayError> {
 
     //println!("{:?}", headers);
 
-    for result in rdr.records() {
-        let record = match result {
-            Ok(val) => val,
-            _ => return Err(MicroarrayError::FileError("header issue".to_string())),
-        };
+    //for result in rdr.records() {
+    for row in data {
+        //let record = match result {
+        //    Ok(val) => val,
+        //    _ => return Err(MicroarrayError::FileError("header issue".to_string())),
+        //};
 
-        let row = cols.iter().map(|c| &record[*c]).collect::<Vec<&str>>();
+        //let row = cols.iter().map(|c| &record[*c]).collect::<Vec<&str>>();
         //println!("{}", &record[0]);
         match wtr.write_record(&row) {
             Ok(val) => val,
