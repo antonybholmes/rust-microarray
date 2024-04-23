@@ -85,13 +85,9 @@ impl Microarray {
         let mut gene_symbols: StringRecord = StringRecord::new();
         rdr.read_record(&mut gene_symbols)?;
 
-        // let mut rdr = csv::ReaderBuilder::new()
-        //     .has_headers(true)
-        //     .delimiter(b'\t')
-        //     .from_reader(file);
+        
 
-        // let file = File::open("./data/microarray/hgu133plus2.rma.collapsed.tsv")
-        //     .map_err(|_| MicroarrayError::FileError("file issue".to_string()))?;
+     
 
         let mut row_records: Vec<StringRecord> = vec![];
         let mut samples_names: Vec<String> = vec![];
@@ -116,54 +112,13 @@ impl Microarray {
         }
 
         let n_samples = samples_names.len();
-
-        //eprintln!("dfsf {:?}", samples_names);
-
-        //let headers = rdr
-        //    .headers()
-        //    .map_err(|_| MicroarrayError::FileError("file issue".to_string()))?;
-
-        // let mut header_map: HashMap<String, usize> = HashMap::<String, usize>::new();
-
-        // for i in 0..headers.len() {
-        //     header_map.insert(headers[i].to_string(), i as usize);
-        // }
-
-        //let mut cols: Vec<&usize> = vec![&0, &1, &2];
-        // let mut sample_cols: Vec<&usize> = samples
-        //     .iter()
-        //     .map(|sample| header_map.get(sample).unwrap_or_else(|| &std::usize::MAX))
-        //     .filter(|c| **c < std::usize::MAX)
-        //     .collect::<Vec<&usize>>();
-
-        // cols.append(&mut sample_cols);
-
-        //let mut data: Vec<Vec<String>> = vec![vec!["".to_string(); cols.len()]; 60000];
-
-        //let cols = (0..samp.len()).into_iter().filter(|c|headers[c]).collect::<Vec<u32>>();
-
-        // for result in rdr.records() {
-        //     let record = match result {
-        //         Ok(val) => val,
-        //         _ => return Err(MicroarrayError::FileError("header issue".to_string())),
-        //     };
-
-        //     let row = cols.iter().map(|c| &record[**c]).collect::<Vec<&str>>();
-
-        //     data.push(row.into_iter().map(|x| x.to_string()).collect());
-        // }
-
+ 
         let mut wtr = csv::WriterBuilder::new()
             .delimiter(b'\t')
             //.quote_style(csv::QuoteStyle::NonNumeric)
             .has_headers(true)
             .quote_style(csv::QuoteStyle::Never)
             .from_writer(vec![]);
-
-        //let headers = rdr
-        //    .headers()
-        //    .map_err(|_| MicroarrayError::FileError("header issue".to_string()))?;
-        //println!("{:?}", &cols.into_iter().map(|c|&headers[c]).collect::<Vec<&str>>());
 
         let mut header: Vec<String> = vec![
             "Probe Id".to_string(),
