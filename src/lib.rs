@@ -48,11 +48,14 @@ pub fn make_tsv(samples: &Vec<String>) -> Result<String, MicroarrayError> {
         header_map.insert(headers[i].to_string(), i as usize);
     }
 
-    let cols = samples
+    let mut cols: Vec<&usize> = vec![&0, &1, &2];
+    let mut sample_cols: Vec<&usize> = samples
         .iter()
         .map(|sample| header_map.get(sample).unwrap_or_else(|| &std::usize::MAX))
         .filter(|c| **c < std::usize::MAX)
         .collect::<Vec<&usize>>();
+
+    cols.append(&mut sample_cols);
 
     //let mut data: Vec<Vec<String>> = vec![vec!["".to_string(); cols.len()]; 60000];
 
@@ -76,11 +79,7 @@ pub fn make_tsv(samples: &Vec<String>) -> Result<String, MicroarrayError> {
         .quote_style(csv::QuoteStyle::Never)
         .from_writer(vec![]);
 
-    let headers = match rdr.headers() {
-        Ok(val) => val,
-        _ => return Err(MicroarrayError::FileError("header issue".to_string())),
-    };
-
+    let headers = rdr.headers().map_err(|_| MicroarrayError::FileError("header issue".to_string()))?;
     //println!("{:?}", &cols.into_iter().map(|c|&headers[c]).collect::<Vec<&str>>());
 
     let header = cols.iter().map(|c| &headers[**c]).collect::<Vec<&str>>();
