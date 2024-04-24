@@ -1,6 +1,7 @@
-use std::{fmt::Display, fs::{remove_dir, File}, io, path::Path, string::FromUtf8Error};
+use std::{fmt::Display, fs::File, io, path::Path, string::FromUtf8Error};
 
 use csv::{IntoInnerError, StringRecord};
+use serde::Serialize;
 
 mod tests;
 
@@ -45,12 +46,18 @@ impl Display for MicroarrayError {
     }
 }
 
+#[derive(Serialize)]
+pub struct ExpressionDataIndex {
+    pub probe_ids: Vec<String>,
+    pub entrez_ids: Vec<String>,
+    pub gene_symbols: Vec<String>,
+}
+
+#[derive(Serialize)]
 pub struct ExpressionData {
-    data:Vec<Vec<f64>>,
-    headers: Vec<String>,
-    probe_ids: Vec<String>,
-    entrez_ids: Vec<String>
-    gene_symbols: Vec<String>
+    pub values: Vec<Vec<f64>>,
+    pub headers: Vec<String>,
+    pub index: ExpressionDataIndex,
 }
 
 pub struct Microarray {
@@ -147,7 +154,7 @@ impl Microarray {
 
         // We are going to transpose the data we read into this output
         // array
-        let mut data:Vec<Vec<f64>> = vec![vec![0.0; n_samples]; n_probes] ;
+        let mut data: Vec<Vec<f64>> = vec![vec![0.0; n_samples]; n_probes];
 
         for row in 0..n_probes {
             out_row[0] = probe_ids[row + 1].to_string();
@@ -157,7 +164,7 @@ impl Microarray {
             for col in 0..n_samples {
                 out_row[3 + col] = format!("{}", row_records[col][row]);
 
-                 data[row][col] = row_records[col][row];
+                data[row][col] = row_records[col][row];
             }
 
             //eprintln!("{:?} {} out_row", out_row, n_samples);
@@ -206,16 +213,16 @@ impl Microarray {
         //let mut probe_ids: StringRecord = StringRecord::new();
         rdr.read_record(&mut record)?;
 
-        let probe_ids:Vec<String> = (1..record.len()).map(|i|record[i].to_string()).collect();
+        let probe_ids: Vec<String> = (1..record.len()).map(|i| record[i].to_string()).collect();
 
         // probes/rows is -1 because first col is a header so ignore that
-        let n_probes: usize = probe_ids.len() ;
+        let n_probes: usize = probe_ids.len();
 
         rdr.read_record(&mut record)?;
-        let entrez_ids:Vec<String> = (1..record.len()).map(|i|record[i].to_string()).collect();
+        let entrez_ids: Vec<String> = (1..record.len()).map(|i| record[i].to_string()).collect();
 
         rdr.read_record(&mut record)?;
-        let gene_symbols:Vec<String> = (1..record.len()).map(|i|record[i].to_string()).collect();
+        let gene_symbols: Vec<String> = (1..record.len()).map(|i| record[i].to_string()).collect();
 
         let mut row_records: Vec<Vec<f64>> = Vec::with_capacity(n_samples);
         let mut samples_names: Vec<String> = Vec::with_capacity(n_samples);
@@ -246,16 +253,14 @@ impl Microarray {
             row_records.push(values);
         }
 
-        
-
-       
-
         let mut exp = ExpressionData {
-            data: vec![vec![0.0; n_samples]; n_probes],
-            headers:samples_names,
-            probe_ids ,
-            entrez_ids ,
-            gene_symbols ,
+            values: vec![vec![0.0; n_samples]; n_probes],
+            headers: samples_names,
+            index: ExpressionDataIndex {
+                probe_ids,
+                entrez_ids,
+                gene_symbols,
+            },
         };
 
         // We are going to transpose the data we read into this output
@@ -263,15 +268,13 @@ impl Microarray {
         //let mut data:Vec<Vec<f64>> = vec![vec![0.0; n_samples]; n_probes] ;
 
         for row in 0..n_probes {
-     
             for col in 0..n_samples {
-            
-                 exp.data[row][col] = row_records[col][row];
+                exp.values[row][col] = row_records[col][row];
             }
 
             //eprintln!("{:?} {} out_row", out_row, n_samples);
 
-           // wtr.write_record(&out_row)?;
+            // wtr.write_record(&out_row)?;
         }
 
         // for result in rdr.records() {
