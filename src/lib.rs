@@ -1,4 +1,4 @@
-use std::{fmt::Display, fs::File, io, path::Path, string::FromUtf8Error};
+use std::{fmt::Display, fs::{remove_dir, File}, io, path::Path, string::FromUtf8Error};
 
 use csv::{IntoInnerError, StringRecord};
 
@@ -45,6 +45,14 @@ impl Display for MicroarrayError {
     }
 }
 
+pub struct ExpressionData {
+    data:Vec<Vec<f64>>,
+    headers: Vec<String>,
+    probe_ids: Vec<String>,
+    entrez_ids: Vec<String>
+    gene_symbols: Vec<String>
+}
+
 pub struct Microarray {
     path: String,
 }
@@ -85,12 +93,8 @@ impl Microarray {
         let mut gene_symbols: StringRecord = StringRecord::new();
         rdr.read_record(&mut gene_symbols)?;
 
-        
-
-     
-
-        let mut row_records: Vec<StringRecord> = vec![];
-        let mut samples_names: Vec<String> = vec![];
+        let mut row_records: Vec<Vec<f64>> = Vec::with_capacity(sample_ids.len());
+        let mut samples_names: Vec<String> = Vec::with_capacity(sample_ids.len());
 
         // let mut rdr = csv::ReaderBuilder::new()
         //     .has_headers(true)
@@ -108,11 +112,18 @@ impl Microarray {
             let mut row: StringRecord = StringRecord::new();
             rdr.read_record(&mut row)?;
             samples_names.push(row[0].to_string());
-            row_records.push(row);
+
+            // read data into array
+            let values = (1..row.len())
+                .into_iter()
+                .map(|i| row[i].parse::<f64>().unwrap())
+                .collect::<Vec<f64>>();
+
+            row_records.push(values);
         }
 
         let n_samples = samples_names.len();
- 
+
         let mut wtr = csv::WriterBuilder::new()
             .delimiter(b'\t')
             //.quote_style(csv::QuoteStyle::NonNumeric)
@@ -132,15 +143,21 @@ impl Microarray {
         wtr.write_record(&header)?;
         //println!("{:?}", headers);
 
-        let mut out_row = vec![""; header.len()];
+        let mut out_row: Vec<String> = Vec::with_capacity(header.len());
+
+        // We are going to transpose the data we read into this output
+        // array
+        let mut data:Vec<Vec<f64>> = vec![vec![0.0; n_samples]; n_probes] ;
 
         for row in 0..n_probes {
-            out_row[0] = &probe_ids[row + 1];
-            out_row[1] = &entrez_ids[row + 1];
-            out_row[2] = &gene_symbols[row + 1];
+            out_row[0] = probe_ids[row + 1].to_string();
+            out_row[1] = entrez_ids[row + 1].to_string();
+            out_row[2] = gene_symbols[row + 1].to_string();
 
             for col in 0..n_samples {
-                out_row[3 + col] = &row_records[col][row + 1];
+                out_row[3 + col] = format!("{}", row_records[col][row]);
+
+                 data[row][col] = row_records[col][row];
             }
 
             //eprintln!("{:?} {} out_row", out_row, n_samples);
@@ -165,5 +182,113 @@ impl Microarray {
 
         Ok(data)
     }
-}
 
+    pub fn expression(&self, sample_ids: &Vec<&str>) -> Result<ExpressionData, MicroarrayError> {
+        // let sample_ids = vec![
+        //     "0c3b8a19-1975-4c6e-aece-44a59c71719d",
+        //     "0c4f0c89-af16-484a-a408-8dfde25d8f10",
+        // ];
+
+        let n_samples = sample_ids.len();
+
+        //eprintln!("{:?}", Path::new(&self.path).join("meta.tsv").to_str());
+        // open meta data
+        let file = File::open(Path::new(&self.path).join("meta.tsv"))?;
+
+        //eprintln!("{:?}", file.metadata());
+
+        let mut rdr = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .delimiter(b'\t')
+            .from_reader(file);
+
+        let mut record: StringRecord = StringRecord::new();
+        //let mut probe_ids: StringRecord = StringRecord::new();
+        rdr.read_record(&mut record)?;
+
+        let probe_ids:Vec<String> = (1..record.len()).map(|i|record[i].to_string()).collect();
+
+        // probes/rows is -1 because first col is a header so ignore that
+        let n_probes: usize = probe_ids.len() ;
+
+        rdr.read_record(&mut record)?;
+        let entrez_ids:Vec<String> = (1..record.len()).map(|i|record[i].to_string()).collect();
+
+        rdr.read_record(&mut record)?;
+        let gene_symbols:Vec<String> = (1..record.len()).map(|i|record[i].to_string()).collect();
+
+        let mut row_records: Vec<Vec<f64>> = Vec::with_capacity(n_samples);
+        let mut samples_names: Vec<String> = Vec::with_capacity(n_samples);
+
+        // let mut rdr = csv::ReaderBuilder::new()
+        //     .has_headers(true)
+        //     .delimiter(b'\t')
+        //     .from_reader(file);
+
+        for sample_id in sample_ids {
+            let file = File::open(Path::new(&self.path).join(format!("{}.tsv", sample_id)))?;
+
+            rdr = csv::ReaderBuilder::new()
+                .has_headers(true)
+                .delimiter(b'\t')
+                .from_reader(file);
+
+            let mut row: StringRecord = StringRecord::new();
+            rdr.read_record(&mut row)?;
+            samples_names.push(row[0].to_string());
+
+            // read data into array
+            let values = (1..row.len())
+                .into_iter()
+                .map(|i| row[i].parse::<f64>().unwrap())
+                .collect::<Vec<f64>>();
+
+            row_records.push(values);
+        }
+
+        
+
+       
+
+        let mut exp = ExpressionData {
+            data: vec![vec![0.0; n_samples]; n_probes],
+            headers:samples_names,
+            probe_ids ,
+            entrez_ids ,
+            gene_symbols ,
+        };
+
+        // We are going to transpose the data we read into this output
+        // array
+        //let mut data:Vec<Vec<f64>> = vec![vec![0.0; n_samples]; n_probes] ;
+
+        for row in 0..n_probes {
+     
+            for col in 0..n_samples {
+            
+                 exp.data[row][col] = row_records[col][row];
+            }
+
+            //eprintln!("{:?} {} out_row", out_row, n_samples);
+
+           // wtr.write_record(&out_row)?;
+        }
+
+        // for result in rdr.records() {
+        //     //for row in data {
+        //     let record =
+        //         result.map_err(|_| MicroarrayError::FileError("header issue".to_string()))?;
+
+        //     let row = cols.iter().map(|c| &record[**c]).collect::<Vec<&str>>();
+        //     //println!("{}", &record[0]);
+        //     wtr.write_record(&row)
+        //         .map_err(|_| MicroarrayError::FileError("header issue".to_string()))?;
+        // }
+
+        //let vec: Vec<u8> = wtr.into_inner()?;
+
+        //let data = String::from_utf8(vec)?;
+
+        Ok(exp)
+    }
+}
