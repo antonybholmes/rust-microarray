@@ -47,6 +47,7 @@ impl Display for MicroarrayError {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExpressionDataIndex {
     pub probe_ids: Vec<String>,
     pub entrez_ids: Vec<String>,
@@ -55,8 +56,8 @@ pub struct ExpressionDataIndex {
 
 #[derive(Serialize)]
 pub struct ExpressionData {
-    pub values: Vec<Vec<f64>>,
-    pub headers: Vec<String>,
+    pub exp: Vec<Vec<f64>>,
+    pub header: Vec<String>,
     pub index: ExpressionDataIndex,
 }
 
@@ -190,6 +191,8 @@ impl Microarray {
         Ok(data)
     }
 
+    ///
+    /// Create an expression table from microarray data.
     pub fn expression(&self, sample_ids: &Vec<&str>) -> Result<ExpressionData, MicroarrayError> {
         // let sample_ids = vec![
         //     "0c3b8a19-1975-4c6e-aece-44a59c71719d",
@@ -213,16 +216,15 @@ impl Microarray {
         //let mut probe_ids: StringRecord = StringRecord::new();
         rdr.read_record(&mut record)?;
 
-        let probe_ids: Vec<String> = (1..record.len()).map(|i| record[i].to_string()).collect();
-
-        // probes/rows is -1 because first col is a header so ignore that
+   
+        let probe_ids: Vec<String> = record.iter().skip(1).map(|v| v.to_string()).collect();
         let n_probes: usize = probe_ids.len();
 
         rdr.read_record(&mut record)?;
-        let entrez_ids: Vec<String> = (1..record.len()).map(|i| record[i].to_string()).collect();
+        let entrez_ids: Vec<String> = record.iter().skip(1).map(|v| v.to_string()).collect();
 
         rdr.read_record(&mut record)?;
-        let gene_symbols: Vec<String> = (1..record.len()).map(|i| record[i].to_string()).collect();
+        let gene_symbols: Vec<String> = record.iter().skip(1).map(|v| v.to_string()).collect();
 
         let mut row_records: Vec<Vec<f64>> = Vec::with_capacity(n_samples);
         let mut samples_names: Vec<String> = Vec::with_capacity(n_samples);
@@ -232,7 +234,7 @@ impl Microarray {
         //     .delimiter(b'\t')
         //     .from_reader(file);
 
-        for sample_id in sample_ids {
+        for sample_id in sample_ids.iter() {
             let file = File::open(Path::new(&self.path).join(format!("{}.tsv", sample_id)))?;
 
             rdr = csv::ReaderBuilder::new()
@@ -245,17 +247,18 @@ impl Microarray {
             samples_names.push(row[0].to_string());
 
             // read data into array
-            let values = (1..row.len())
-                .into_iter()
-                .map(|i| row[i].parse::<f64>().unwrap())
+            let values = row
+                .iter()
+                .skip(1)
+                .map(|v| v.parse::<f64>().unwrap())
                 .collect::<Vec<f64>>();
 
             row_records.push(values);
         }
 
-        let mut exp = ExpressionData {
-            values: vec![vec![0.0; n_samples]; n_probes],
-            headers: samples_names,
+        let mut table = ExpressionData {
+            exp: vec![vec![0.0; n_samples]; n_probes],
+            header: samples_names,
             index: ExpressionDataIndex {
                 probe_ids,
                 entrez_ids,
@@ -269,7 +272,7 @@ impl Microarray {
 
         for row in 0..n_probes {
             for col in 0..n_samples {
-                exp.values[row][col] = row_records[col][row];
+                table.exp[row][col] = row_records[col][row];
             }
 
             //eprintln!("{:?} {} out_row", out_row, n_samples);
@@ -292,6 +295,6 @@ impl Microarray {
 
         //let data = String::from_utf8(vec)?;
 
-        Ok(exp)
+        Ok(table)
     }
 }
