@@ -3,11 +3,14 @@ use std::{fmt::Display, fs::File, io, path::Path, string::FromUtf8Error};
 use csv::{IntoInnerError, StringRecord};
 use serde::Serialize;
 
+pub mod search;
+
 mod tests;
 
 #[derive(Debug, Clone)]
 pub enum MicroarrayError {
     FileError(String),
+    DatabaseError(String)
 }
 
 impl From<csv::Error> for MicroarrayError {
@@ -41,10 +44,16 @@ impl Display for MicroarrayError {
         match self {
             MicroarrayError::FileError(user) => {
                 write!(f, "account for {} does not exist", user)
+            },
+            MicroarrayError::DatabaseError(user) => {
+                write!(f, "account for {} does not exist", user)
             }
         }
     }
 }
+
+pub type MicroarrayResult<T> = std::result::Result<T, MicroarrayError>;
+
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
